@@ -1,11 +1,12 @@
 import os
 import subprocess
-import whisper
+from vosk import Model, KaldiRecognizer
+import wave
+import json
 import boto3
 from transformers import pipeline
 import time
 import hashlib
-import requests
 
 # ========== AWS S3 Upload ==========
 def upload_to_s3(file_path, bucket_name, s3_key):
@@ -32,28 +33,55 @@ def extract_audio(video_path='video.mp4', audio_path='audio.wav'):
     print("[*] Audio extracted.")
 
 # ========== Step 3: Transcribe with Whisper ==========
-HF_API_TOKEN = "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"
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3"
 
 def transcribe_audio(audio_path='audio.wav'):
-    print("[*] Transcribing audio via Hugging Face Whisper API...")
-    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+    print("[*] Transcribing audio with Vosk...")
 
-    with open(audio_path, 'rb') as audio_file:
-        files = {"file": audio_file}
-        response = requests.post(HF_MODEL_URL, headers=headers, files=files)
+    if not os.path.exists("model"):
+        return "[Error: Vosk model not found]"
 
-    print("[DEBUG] Status Code:", response.status_code)
-    print("[DEBUG] Response:", response.text)
+    wf = wave.open(audio_path, "rb")
+    if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getframerate() != 16000:
+        return "[Error: Audio must be WAV with 16kHz mono PCM]"
 
-    if response.status_code != 200:
-        print("[-] Transcription API failed.")
-        return "[Error: Transcription failed]"
+    model = Model("model")
+    rec = KaldiRecognizer(model, wf.getframerate())
 
-    result = response.json()
-    transcript = result.get('text', '[Error: No transcript found]')
-    print("[*] Transcription complete via API.")
+    results = []
+    while True:
+        data = wf.readframes(4000)
+        if len(data) == 0:
+            break
+        if rec.AcceptWaveform(data):
+            results.append(json.loads(rec.Result()))
+    results.append(json.loads(rec.FinalResult()))
+
+    transcript = " ".join([res.get("text", "") for res in results])
+    print("[*] Transcription complete with Vosk.")
     return transcript
+
+# HF_API_TOKEN = "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"
+# HF_MODEL_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3"
+
+# def transcribe_audio(audio_path='audio.wav'):
+#     print("[*] Transcribing audio via Hugging Face Whisper API...")
+#     headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+
+#     with open(audio_path, 'rb') as audio_file:
+#         files = {"file": audio_file}
+#         response = requests.post(HF_MODEL_URL, headers=headers, files=files)
+
+#     print("[DEBUG] Status Code:", response.status_code)
+#     print("[DEBUG] Response:", response.text)
+
+#     if response.status_code != 200:
+#         print("[-] Transcription API failed.")
+#         return "[Error: Transcription failed]"
+
+#     result = response.json()
+#     transcript = result.get('text', '[Error: No transcript found]')
+#     print("[*] Transcription complete via API.")
+#     return transcript
 
 # def transcribe_audio(audio_path='audio.wav'):
 #     print("[*] Transcribing audio with Whisper...")
