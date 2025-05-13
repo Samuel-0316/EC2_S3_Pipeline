@@ -5,6 +5,7 @@ import boto3
 from transformers import pipeline
 import time
 import hashlib
+import requests
 
 # ========== AWS S3 Upload ==========
 def upload_to_s3(file_path, bucket_name, s3_key):
@@ -31,13 +32,36 @@ def extract_audio(video_path='video.mp4', audio_path='audio.wav'):
     print("[*] Audio extracted.")
 
 # ========== Step 3: Transcribe with Whisper ==========
+HF_API_TOKEN = "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"
+HF_MODEL_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3"
+
 def transcribe_audio(audio_path='audio.wav'):
-    print("[*] Transcribing audio with Whisper...")
-    model = whisper.load_model("tiny")
-    result = model.transcribe(audio_path)
-    transcript = result['text']
-    print("[*] Transcription complete.")
+    print("[*] Transcribing audio via Hugging Face Whisper API...")
+    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+
+    with open(audio_path, 'rb') as audio_file:
+        files = {"file": audio_file}
+        response = requests.post(HF_MODEL_URL, headers=headers, files=files)
+
+    print("[DEBUG] Status Code:", response.status_code)
+    print("[DEBUG] Response:", response.text)
+
+    if response.status_code != 200:
+        print("[-] Transcription API failed.")
+        return "[Error: Transcription failed]"
+
+    result = response.json()
+    transcript = result.get('text', '[Error: No transcript found]')
+    print("[*] Transcription complete via API.")
     return transcript
+
+# def transcribe_audio(audio_path='audio.wav'):
+#     print("[*] Transcribing audio with Whisper...")
+#     model = whisper.load_model("tiny")
+#     result = model.transcribe(audio_path)
+#     transcript = result['text']
+#     print("[*] Transcription complete.")
+#     return transcript
 
 # ========== Step 4: QA with DistilBERT ==========
 def ask_question(transcript, question):
