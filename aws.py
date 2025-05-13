@@ -4,9 +4,9 @@ from vosk import Model, KaldiRecognizer
 import wave
 import json
 import boto3
-from transformers import pipeline
 import time
 import hashlib
+from transformers import pipeline
 
 # ========== AWS S3 Upload ==========
 def upload_to_s3(file_path, bucket_name, s3_key):
@@ -20,7 +20,13 @@ def upload_to_s3(file_path, bucket_name, s3_key):
 # ========== Step 1: Download YouTube Video ==========
 def download_youtube_video(url, output_path='video.mp4'):
     print("[*] Downloading video...")
-    subprocess.run(['yt-dlp', '-f', 'best', '-o', output_path, url], check=True)
+    subprocess.run([
+        'yt-dlp',
+        '--cookies', 'cookies.txt',
+        '-f', 'best',
+        '-o', output_path,
+        url
+    ], check=True)
     print("[*] Video downloaded.")
 
 # ========== Step 2: Extract Audio ==========
@@ -59,37 +65,6 @@ def transcribe_audio(audio_path='audio.wav'):
     transcript = " ".join([res.get("text", "") for res in results])
     print("[*] Transcription complete with Vosk.")
     return transcript
-
-# HF_API_TOKEN = "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"
-# HF_MODEL_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3"
-
-# def transcribe_audio(audio_path='audio.wav'):
-#     print("[*] Transcribing audio via Hugging Face Whisper API...")
-#     headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-
-#     with open(audio_path, 'rb') as audio_file:
-#         files = {"file": audio_file}
-#         response = requests.post(HF_MODEL_URL, headers=headers, files=files)
-
-#     print("[DEBUG] Status Code:", response.status_code)
-#     print("[DEBUG] Response:", response.text)
-
-#     if response.status_code != 200:
-#         print("[-] Transcription API failed.")
-#         return "[Error: Transcription failed]"
-
-#     result = response.json()
-#     transcript = result.get('text', '[Error: No transcript found]')
-#     print("[*] Transcription complete via API.")
-#     return transcript
-
-# def transcribe_audio(audio_path='audio.wav'):
-#     print("[*] Transcribing audio with Whisper...")
-#     model = whisper.load_model("tiny")
-#     result = model.transcribe(audio_path)
-#     transcript = result['text']
-#     print("[*] Transcription complete.")
-#     return transcript
 
 # ========== Step 4: QA with DistilBERT ==========
 def ask_question(transcript, question):
