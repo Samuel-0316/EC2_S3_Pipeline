@@ -122,4 +122,4 @@ if __name__ == "__main__":
             print("👋 Goodbye!")
             break
         answer = ask_question(transcript, question)
-        print("Bot:", answer)
+        print("Bot:", answer) 
